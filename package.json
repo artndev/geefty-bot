@@ -7,10 +7,21 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "tsx src/index.ts",
+    "watch": "tsx watch --exclude node_modules --include src/** src/index.ts",
+    "test": "tsx src/test.ts"
   },
   "dependencies": {
+    "@mtproto/core": "^6.3.0",
+    "input": "^1.0.1",
+    "prebuilt-tdlib": "^0.1008050.0",
+    "tdl": "^8.0.2",
+    "telegram": "^2.26.22"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.3",
     "dotenv": "^16.5.0",
+    "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   }
 }
