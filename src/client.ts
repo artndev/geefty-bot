@@ -30,7 +30,7 @@ export default class Client {
     );
 
     _client.session.setDC(
-      2,
+      Number(process.env.MTPROTO_SERVER_NUMBER),
       process.env.MTPROTO_SERVER_IP!,
       Number(process.env.MTPROTO_SERVER_PORT)
     );
@@ -81,13 +81,13 @@ export default class Client {
         workers: 1,
       });
 
-      await this.client.sendFile(1153031909, {
+      await this.client.sendFile(process.env.CHAT_ID!, {
         file: uploadedFile,
         attributes: [
           new Api.DocumentAttributeSticker({
             stickerset: new Api.InputStickerSetEmpty(),
             mask: false,
-            alt: "Gift Sticker",
+            alt: "gift",
           }),
         ],
       });
