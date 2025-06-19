@@ -9,10 +9,13 @@ import { StoreSession } from "telegram/sessions";
 import { Api } from "telegram/tl";
 
 export default class Client {
-  public client;
+  public client: TelegramClient;
+
   private DIRS = {
-    IMAGES_DIR: path.join(import.meta.dirname, "/tmp"),
+    TEMP_DIR: path.join(import.meta.dirname, "/temp"),
   };
+
+  private err: string | null | unknown;
 
   constructor(_client: TelegramClient) {
     this.client = _client;
@@ -20,11 +23,10 @@ export default class Client {
 
   static build = async () => {
     const _client = new TelegramClient(
-      new StoreSession("user"),
+      new StoreSession("auth"),
       Number(process.env.APP_API_ID),
       process.env.APP_API_HASH!,
       {
-        testServers: false,
         connectionRetries: 5,
       }
     );
@@ -40,67 +42,132 @@ export default class Client {
       botAuthToken: process.env.BOT_TOKEN!,
     });
 
-    return new Client(_client);
+    const client = new Client(_client);
+    await client.createDirs();
+    await client.clearDirs();
+
+    return client;
   };
 
-  clearDirs = async () => {
-    for (const [_, dir] of Object.entries(this.DIRS)) {
-      const files = await fs.readdir(dir);
+  private createDirs = async () => {
+    try {
+      for (const [_, dir] of Object.entries(this.DIRS))
+        await fs.mkdir(dir, { recursive: true });
+    } catch (err) {
+      this.err = err;
 
-      await files.map((file) => fs.unlink(path.join(dir, file)));
+      console.log(err);
+    }
+  };
+
+  private clearDirs = async () => {
+    try {
+      for (const [_, dir] of Object.entries(this.DIRS)) {
+        const files = await fs.readdir(dir);
+
+        await files.map((file) => fs.unlink(path.join(dir, file)));
+      }
+    } catch (err) {
+      this.err = err;
+
+      console.log(err);
     }
   };
 
   getGifts = async () => {
-    await this.clearDirs();
+    try {
+      const res = await this.client.invoke(new Api.payments.GetStarGifts({}));
 
-    const res = await this.client.invoke(new Api.payments.GetStarGifts({}));
+      return res.toJSON()!.gifts;
+    } catch (err) {
+      this.err = err;
 
-    res.toJSON()!.gifts.forEach(async (gift) => {
-      const originalArgs = gift.originalArgs as typeof gift.originalArgs & {
-        sticker: Api.Document;
-      };
-      const sticker = originalArgs.sticker;
-      const file = await this.client.downloadFile(
-        new Api.InputDocumentFileLocation({
-          id: sticker.id,
-          accessHash: sticker.accessHash,
-          fileReference: sticker.fileReference,
-          thumbSize: "",
-        })
-      );
+      console.log(err);
 
-      const fileName = `${gift.id}.tgs`;
-      const filePath = path.join(this.DIRS.IMAGES_DIR, fileName);
-      await fs.writeFile(filePath, file!);
-
-      const fileStats = await fs.stat(filePath);
-      const fileSize = fileStats.size;
-      const uploadedFile = await this.client.uploadFile({
-        file: new CustomFile(fileName, fileSize, filePath),
-        workers: 1,
-      });
-
-      await this.client.sendFile(process.env.CHAT_ID!, {
-        file: uploadedFile,
-        attributes: [
-          new Api.DocumentAttributeSticker({
-            stickerset: new Api.InputStickerSetEmpty(),
-            mask: false,
-            alt: "gift",
-          }),
-        ],
-      });
-    });
-
-    return res;
+      return null;
+    }
   };
 
-  getGiftOptions = async () => {
-    const res = await this.client.invoke(
-      new Api.payments.GetStarsGiftOptions({})
-    );
+  getAvailableGifts = async () => {
+    try {
+      const gifts = await this.getGifts();
+      if (!gifts) throw new Error("Gifts are empty");
 
-    return res;
+      return gifts.filter(
+        (gift) => !(gift.originalArgs as { soldOut?: boolean }).soldOut
+      );
+    } catch (err) {
+      this.err = err;
+
+      console.log(err);
+
+      return null;
+    }
+  };
+
+  sendGifts = async () => {
+    await this.clearDirs();
+
+    const gifts = await this.getAvailableGifts();
+
+    return new Promise(async (resolve, reject) => {
+      try {
+        if (!gifts || this.err) {
+          reject(this.err);
+          this.err = null;
+          return;
+        }
+
+        await gifts.forEach((gift, i) => {
+          setTimeout(async () => {
+            const originalArgs = gift.originalArgs as {
+              sticker: Api.Document;
+              stars: Api.long;
+            };
+            const sticker = originalArgs.sticker;
+
+            const file = await this.client.downloadFile(
+              new Api.InputDocumentFileLocation({
+                id: sticker.id,
+                accessHash: sticker.accessHash,
+                fileReference: sticker.fileReference,
+                thumbSize: "",
+              })
+            );
+            const fileName = `${gift.id}.tgs`;
+            const filePath = path.join(this.DIRS.TEMP_DIR, fileName);
+
+            await fs.writeFile(filePath, file!);
+
+            const fileStats = await fs.stat(filePath);
+            const fileSize = fileStats.size;
+            const uploadedFile = await this.client.uploadFile({
+              file: new CustomFile(fileName, fileSize, filePath),
+              workers: 1,
+            });
+
+            const message = await this.client.sendFile(process.env.CHAT_ID!, {
+              file: uploadedFile,
+              attributes: [
+                new Api.DocumentAttributeSticker({
+                  stickerset: new Api.InputStickerSetEmpty(),
+                  mask: false,
+                  alt: "gift",
+                }),
+              ],
+            });
+
+            await this.client.sendMessage(process.env.CHAT_ID!, {
+              message: `${originalArgs.stars.toString()} ⭐`,
+              replyTo: message.id,
+            });
+          }, 3000 * i);
+        });
+
+        setTimeout(resolve, 3000 * gifts.length);
+      } catch (err) {
+        reject(err);
+      }
+    });
   };
 }
