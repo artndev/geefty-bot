@@ -14,10 +14,11 @@ import Constants from "./constants.js";
 export default class Client {
   public client: TelegramClient;
 
+  private spinner: Ora;
+
+  // constants
   private DIRS;
   private PATHS;
-
-  private spinner = ora();
 
   constructor(
     _client: TelegramClient,
@@ -31,71 +32,111 @@ export default class Client {
     this.spinner = _spinner;
   }
 
-  static build = async () => {
+  public static async build(): Promise<Client> {
+    // initializing spinner
     const spinner = ora();
     spinner.start("Client is building...\n");
 
     const _client = new TelegramClient(
-      new StoreSession("auth"),
+      new StoreSession("auth"), // its important for users not bots though its required
       Number(process.env.APP_API_ID),
       process.env.APP_API_HASH!,
       {
+        testServers: false, // test numbers are not longer supported
         connectionRetries: 5,
       }
     );
 
+    // getting rid of logging
     _client.setLogLevel(LogLevel.NONE);
+
+    // setting the friendly environment
     _client.session.setDC(
       Number(process.env.MTPROTO_SERVER_NUMBER),
       process.env.MTPROTO_SERVER_IP!,
       Number(process.env.MTPROTO_SERVER_PORT)
     );
+
+    // saving session data to auth folder
     _client.session.save();
 
     await _client.start({
       botAuthToken: process.env.BOT_TOKEN!,
     });
 
+    // pre-made methods to set | this | variables for client constructor
     const DIRS = await Constants.DIRS();
     const PATHS = await Constants.PATHS();
+
+    // invoking client class
     const client = new Client(_client, DIRS, PATHS, spinner);
 
-    spinner.succeed("Client is built!\n");
+    client.spinner.succeed("Client is built!\n");
 
-    return client;
-  };
+    return client; // its builder so we have to return main class
+  }
 
-  getGifts = async () => {
-    const gifts = await this.client.invoke(new Api.payments.GetStarGifts({}));
+  public async getGifts(): Promise<T_TypeStarGift[]> {
+    // converting class instance to json
+    const data = await this.client.invoke(new Api.payments.GetStarGifts({}));
+    const json = data.toJSON();
 
-    return gifts.toJSON()!.gifts as T_TypeStarGift[];
-  };
+    // originalArgs which contain needed props are blocked by ts so
+    // instead of infinite struggling with ts errs I have made own types with interfaces
+    return json!.gifts as T_TypeStarGift[];
+  }
 
-  getAvailableGifts = async () => {
+  public async getAvailableGifts(): Promise<T_TypeStarGift[]> {
     const gifts = await this.getGifts();
 
-    return gifts.filter(
-      (gift) => !(gift.originalArgs as { soldOut?: boolean }).soldOut
-    );
-  };
+    // extracting gifts for sale
+    return gifts.filter((gift) => !gift.soldOut);
+  }
 
-  monitorUpdates = async () => {
+  public async monitorGifts(): Promise<void> {
     this.spinner.start("Monitoring gifts...");
 
+    // reading db file with data from last call
     const data = await fs.readFile(this.PATHS.DB_PATH, {
       encoding: "utf-8",
     });
 
-    // const gifts = JSON.parse(
-    //   (await fs.readFile(this.PATHS.TEST_PATH)).toString()
-    // ) as MyTypeStarGift[];
-    // const giftIds = new Set(gifts.map((gift) => gift.id.toString()));
-    const gifts = await this.getAvailableGifts();
+    // ? some testing snippets
+    //
+    let gifts = JSON.parse(
+      await fs.readFile(this.PATHS.TEST_PATH, { encoding: "utf-8" })
+    ) as any[];
+
+    gifts = gifts.map((gift) => {
+      const { sticker, ...giftPayload } = gift;
+      const { fileReference, ...stickerPayload } = sticker;
+
+      return {
+        ...giftPayload,
+        sticker: {
+          ...stickerPayload,
+          fileReference: Buffer.from(fileReference, "base64"),
+        },
+      };
+    });
+
+    // console.log("Gifts: ", gifts);
+    //
+    const giftIds = new Set(gifts.map((gift) => gift.id.toString()));
+    // const gifts = await this.getAvailableGifts();
+    // console.log(Buffer.isBuffer(gifts[0]!.sticker.fileReference));
+    // console.log(gifts[0]!.sticker.fileReference.toString("base64"));
+
+    // parsing data from file as json
     const savedGifts = JSON.parse(data) as typeof gifts;
+
+    // getting ids of db items to see changes
     const savedGiftIds = new Set(savedGifts.map((gift) => gift.id.toString()));
 
+    // console.log(giftIds, savedGiftIds);
+
     const newGifts = gifts.filter(
-      (gift) => !savedGiftIds.has(gift.id.toString())
+      (gift) => !savedGiftIds.has(gift.id.toString()) // set is more convenient
     );
     if (!newGifts.length) {
       this.spinner.fail("There are no new gifts");
@@ -104,13 +145,37 @@ export default class Client {
 
     this.spinner.succeed(`Found ${newGifts.length} new gifts`);
 
+    // updating db file with received changes
     await fs.truncate(this.PATHS.DB_PATH, 0);
-    await fs.writeFile(this.PATHS.DB_PATH, JSON.stringify(gifts));
 
+    // Transform gifts for saving, but keep original type for further use
+    const giftsToSave = gifts.map((gift) => {
+      const { sticker, ...giftPayload } = gift;
+      const { fileReference, ...stickerPayload } = sticker;
+
+      return {
+        ...giftPayload,
+        sticker: {
+          ...stickerPayload,
+          fileReference: fileReference.toString("base64"),
+        },
+      };
+    });
+
+    // console.log(JSON.stringify(giftsToSave[0]));
+
+    //console.log(JSON.stringify(giftsToSave));
+    // Ensure all fileReference fields are strings before saving
+    await fs.writeFile(this.PATHS.DB_PATH, JSON.stringify(giftsToSave), {
+      flag: "w",
+    });
+
+    // echoing them
     this.sendGifts(newGifts);
-  };
+  }
 
-  sendGifts = async (gifts: T_TypeStarGift[]) => {
+  public async sendGifts(gifts: T_TypeStarGift[]): Promise<void> {
+    // removing used *.tgs from temp folder
     await Constants.clearDirs();
 
     this.spinner.stopAndPersist({
@@ -119,6 +184,7 @@ export default class Client {
       }...`,
     });
 
+    // promise is better way to handle timeouts
     return new Promise<void>(async (resolve, reject) => {
       try {
         await gifts.forEach((gift, i) => {
@@ -128,6 +194,7 @@ export default class Client {
               return;
             }
 
+            // downloading sticker from telegram servers
             const file = await this.client.downloadFile(
               new Api.InputDocumentFileLocation({
                 id: gift.sticker.id,
@@ -136,18 +203,24 @@ export default class Client {
                 thumbSize: "",
               })
             );
+
             const fileName = `${gift.id}.tgs`;
             const filePath = path.join(this.DIRS.TEMP_DIR, fileName);
 
+            // saving file to temp folder
             await fs.writeFile(filePath, file!);
 
+            // calculating basic description of file
             const fileStats = await fs.stat(filePath);
             const fileSize = fileStats.size;
+
+            // ready to be pushed in chat
             const uploadedFile = await this.client.uploadFile({
               file: new CustomFile(fileName, fileSize, filePath),
               workers: 1,
             });
 
+            // sending to chat
             const message = await this.client.sendFile(Constants.CHAT_ID, {
               file: uploadedFile,
               attributes: [
@@ -159,21 +232,23 @@ export default class Client {
               ],
             });
 
+            // replying to previous message with id and price
             await this.client.sendMessage(Constants.CHAT_ID, {
               message: `#\`${gift.id}\` — ${gift.stars} ⭐`,
               replyTo: message.id,
             });
-          }, Constants.SEND_DELAY * i).unref();
+          }, Constants.SEND_DELAY * i).unref(); // timeout formula for loop
         });
 
+        // when upper timeout is ready, calling finish
         setTimeout(() => {
           this.spinner.succeed("Duplication is completed!");
 
           resolve();
-        }, Constants.SEND_DELAY * gifts.length).unref();
+        }, Constants.SEND_DELAY * gifts.length).unref(); // waiting whole time
       } catch (err) {
         reject(err);
       }
     });
-  };
+  }
 }

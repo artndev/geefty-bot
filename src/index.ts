@@ -9,13 +9,14 @@ import Constants from "./constants.js";
 
   if (!client) return;
 
-  await client.monitorUpdates().catch((err) => console.log(err));
+  await client.monitorGifts().catch((err) => console.log(err));
 
   setInterval(() => {
-    client.monitorUpdates().catch((err) => console.log(err));
-  }, Constants.AUDIT_DELAY).unref();
+    client.monitorGifts().catch((err) => console.log(err));
+  }, Constants.AUDIT_DELAY).unref(); // ! unref prevents app from infinite loop
 })();
 
+// maintaining unref solution
 process.on("SIGINT", () => {
   process.exit();
 });

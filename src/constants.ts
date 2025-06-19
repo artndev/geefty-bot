@@ -4,11 +4,12 @@ dotenv.config();
 import fs from "fs/promises";
 import path from "path";
 
+// | constants | validations | utils |
 export default class Constants {
   static CHAT_ID: number | string = !Number.isNaN(process.env.CHAT_ID)
     ? Number(process.env.CHAT_ID)
     : "me";
-  static IS_TELEGRAM: boolean = this.CHAT_ID !== -100 ? true : false;
+  static IS_TELEGRAM: boolean = this.CHAT_ID !== -100 ? true : false; // when CHAT_ID is -100, logging to console
 
   private static DELAY_LIMIT: number = 5000000;
   static AUDIT_DELAY: number =
@@ -31,13 +32,15 @@ export default class Constants {
     TEST_PATH: path.join(import.meta.dirname, "json", "test_2.txt"),
   };
 
+  // before dirs are got, making some preps
   static DIRS = async () => {
-    await this.createDirs();
-    await this.clearDirs();
+    // await this.createDirs();
+    // await this.clearDirs();
 
     return this._DIRS;
   };
 
+  // same as above
   static PATHS = async () => {
     await this.createOrClearPaths();
 
@@ -59,6 +62,6 @@ export default class Constants {
 
   private static createOrClearPaths = async () => {
     for (const [_, path] of Object.entries(Constants._PATHS))
-      await fs.writeFile(path, "[]", { flag: "w" });
+      await fs.writeFile(path, "[]", { flag: "w" }); // create if not existed
   };
 }
