@@ -14,6 +14,7 @@
   "dependencies": {
     "@mtproto/core": "^6.3.0",
     "input": "^1.0.1",
+    "ora": "^8.2.0",
     "prebuilt-tdlib": "^0.1008050.0",
     "tdl": "^8.0.2",
     "telegram": "^2.26.22"

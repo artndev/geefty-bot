@@ -2,26 +2,39 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import fs from "fs/promises";
+import ora, { Ora } from "ora";
 import path from "path";
 import { TelegramClient } from "telegram";
 import { CustomFile } from "telegram/client/uploads";
+import { LogLevel } from "telegram/extensions/Logger.js";
 import { StoreSession } from "telegram/sessions";
 import { Api } from "telegram/tl";
+import Constants from "./constants.js";
 
 export default class Client {
   public client: TelegramClient;
 
-  private DIRS = {
-    TEMP_DIR: path.join(import.meta.dirname, "/temp"),
-  };
+  private DIRS;
+  private PATHS;
 
-  private err: string | null | unknown;
+  private spinner = ora();
 
-  constructor(_client: TelegramClient) {
+  constructor(
+    _client: TelegramClient,
+    _DIRS: I_DIRS,
+    _PATHS: I_PATHS,
+    _spinner: Ora
+  ) {
     this.client = _client;
+    this.DIRS = _DIRS;
+    this.PATHS = _PATHS;
+    this.spinner = _spinner;
   }
 
   static build = async () => {
+    const spinner = ora();
+    spinner.start("Client is building...\n");
+
     const _client = new TelegramClient(
       new StoreSession("auth"),
       Number(process.env.APP_API_ID),
@@ -31,6 +44,7 @@ export default class Client {
       }
     );
 
+    _client.setLogLevel(LogLevel.NONE);
     _client.session.setDC(
       Number(process.env.MTPROTO_SERVER_NUMBER),
       process.env.MTPROTO_SERVER_IP!,
@@ -42,95 +56,83 @@ export default class Client {
       botAuthToken: process.env.BOT_TOKEN!,
     });
 
-    const client = new Client(_client);
-    await client.createDirs();
-    await client.clearDirs();
+    const DIRS = await Constants.DIRS();
+    const PATHS = await Constants.PATHS();
+    const client = new Client(_client, DIRS, PATHS, spinner);
+
+    spinner.succeed("Client is built!\n");
 
     return client;
   };
 
-  private createDirs = async () => {
-    try {
-      for (const [_, dir] of Object.entries(this.DIRS))
-        await fs.mkdir(dir, { recursive: true });
-    } catch (err) {
-      this.err = err;
-
-      console.log(err);
-    }
-  };
-
-  private clearDirs = async () => {
-    try {
-      for (const [_, dir] of Object.entries(this.DIRS)) {
-        const files = await fs.readdir(dir);
-
-        await files.map((file) => fs.unlink(path.join(dir, file)));
-      }
-    } catch (err) {
-      this.err = err;
-
-      console.log(err);
-    }
-  };
-
   getGifts = async () => {
-    try {
-      const res = await this.client.invoke(new Api.payments.GetStarGifts({}));
+    const gifts = await this.client.invoke(new Api.payments.GetStarGifts({}));
 
-      return res.toJSON()!.gifts;
-    } catch (err) {
-      this.err = err;
-
-      console.log(err);
-
-      return null;
-    }
+    return gifts.toJSON()!.gifts as T_TypeStarGift[];
   };
 
   getAvailableGifts = async () => {
-    try {
-      const gifts = await this.getGifts();
-      if (!gifts) throw new Error("Gifts are empty");
+    const gifts = await this.getGifts();
 
-      return gifts.filter(
-        (gift) => !(gift.originalArgs as { soldOut?: boolean }).soldOut
-      );
-    } catch (err) {
-      this.err = err;
-
-      console.log(err);
-
-      return null;
-    }
+    return gifts.filter(
+      (gift) => !(gift.originalArgs as { soldOut?: boolean }).soldOut
+    );
   };
 
-  sendGifts = async () => {
-    await this.clearDirs();
+  monitorUpdates = async () => {
+    this.spinner.start("Monitoring gifts...");
 
+    const data = await fs.readFile(this.PATHS.DB_PATH, {
+      encoding: "utf-8",
+    });
+
+    // const gifts = JSON.parse(
+    //   (await fs.readFile(this.PATHS.TEST_PATH)).toString()
+    // ) as MyTypeStarGift[];
+    // const giftIds = new Set(gifts.map((gift) => gift.id.toString()));
     const gifts = await this.getAvailableGifts();
+    const savedGifts = JSON.parse(data) as typeof gifts;
+    const savedGiftIds = new Set(savedGifts.map((gift) => gift.id.toString()));
 
-    return new Promise(async (resolve, reject) => {
+    const newGifts = gifts.filter(
+      (gift) => !savedGiftIds.has(gift.id.toString())
+    );
+    if (!newGifts.length) {
+      this.spinner.fail("There are no new gifts");
+      return;
+    }
+
+    this.spinner.succeed(`Found ${newGifts.length} new gifts`);
+
+    await fs.truncate(this.PATHS.DB_PATH, 0);
+    await fs.writeFile(this.PATHS.DB_PATH, JSON.stringify(gifts));
+
+    this.sendGifts(newGifts);
+  };
+
+  sendGifts = async (gifts: T_TypeStarGift[]) => {
+    await Constants.clearDirs();
+
+    this.spinner.stopAndPersist({
+      text: `Duplicating to ${
+        Constants.IS_TELEGRAM ? "Telegram" : "console"
+      }...`,
+    });
+
+    return new Promise<void>(async (resolve, reject) => {
       try {
-        if (!gifts || this.err) {
-          reject(this.err);
-          this.err = null;
-          return;
-        }
-
         await gifts.forEach((gift, i) => {
           setTimeout(async () => {
-            const originalArgs = gift.originalArgs as {
-              sticker: Api.Document;
-              stars: Api.long;
-            };
-            const sticker = originalArgs.sticker;
+            if (!Constants.IS_TELEGRAM) {
+              console.log(`#${gift.id} — ${gift.stars} ⭐`);
+              return;
+            }
 
             const file = await this.client.downloadFile(
               new Api.InputDocumentFileLocation({
-                id: sticker.id,
-                accessHash: sticker.accessHash,
-                fileReference: sticker.fileReference,
+                id: gift.sticker.id,
+                accessHash: gift.sticker.accessHash,
+                fileReference: gift.sticker.fileReference,
                 thumbSize: "",
               })
             );
@@ -146,7 +148,7 @@ export default class Client {
               workers: 1,
             });
 
-            const message = await this.client.sendFile(process.env.CHAT_ID!, {
+            const message = await this.client.sendFile(Constants.CHAT_ID, {
               file: uploadedFile,
               attributes: [
                 new Api.DocumentAttributeSticker({
@@ -157,14 +159,18 @@ export default class Client {
               ],
             });
 
-            await this.client.sendMessage(process.env.CHAT_ID!, {
-              message: `${originalArgs.stars.toString()} ⭐`,
+            await this.client.sendMessage(Constants.CHAT_ID, {
+              message: `#\`${gift.id}\` — ${gift.stars} ⭐`,
               replyTo: message.id,
             });
-          }, 3000 * i);
+          }, Constants.SEND_DELAY * i).unref();
         });
 
-        setTimeout(resolve, 3000 * gifts.length);
+        setTimeout(() => {
+          this.spinner.succeed("Duplication is completed!");
+
+          resolve();
+        }, Constants.SEND_DELAY * gifts.length).unref();
       } catch (err) {
         reject(err);
       }
