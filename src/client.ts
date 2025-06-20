@@ -121,7 +121,6 @@ export default class Client {
     // reading db file with data from last call
     const data = await fs.readFile(this.PATHS.DB_PATH.path, {
       encoding: "utf-8",
-      flag: "w+",
     });
 
     const json = JSON.parse(data) as typeof gifts;
