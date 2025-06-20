@@ -26,7 +26,7 @@ export default class Constants {
   static _DIRS: I_DIRS = {
     TEMP_DIR: path.join(import.meta.dirname, "/temp"),
   };
-  static _PATHS: I_PATHS = {
+  static PATHS: I_PATHS = {
     DB_PATH: path.join(import.meta.dirname, "db.txt"),
     DEFAULT_PATH: path.join(import.meta.dirname, "json", "default_2.txt"),
     TEST_PATH: path.join(import.meta.dirname, "json", "test_2.txt"),
@@ -34,17 +34,10 @@ export default class Constants {
 
   // before dirs are got, making some preps
   static DIRS = async () => {
-    // await this.createDirs();
-    // await this.clearDirs();
+    await this.createDirs();
+    await this.clearDirs();
 
     return this._DIRS;
-  };
-
-  // same as above
-  static PATHS = async () => {
-    await this.createOrClearPaths();
-
-    return this._PATHS;
   };
 
   static clearDirs = async () => {
@@ -58,10 +51,5 @@ export default class Constants {
   private static createDirs = async () => {
     for (const [_, dir] of Object.entries(Constants._DIRS))
       await fs.mkdir(dir, { recursive: true });
-  };
-
-  private static createOrClearPaths = async () => {
-    for (const [_, path] of Object.entries(Constants._PATHS))
-      await fs.writeFile(path, "[]", { flag: "w" }); // create if not existed
   };
 }

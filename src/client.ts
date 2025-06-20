@@ -66,7 +66,7 @@ export default class Client {
 
     // pre-made methods to set | this | variables for client constructor
     const DIRS = await Constants.DIRS();
-    const PATHS = await Constants.PATHS();
+    const PATHS = Constants.PATHS;
 
     // invoking client class
     const client = new Client(_client, DIRS, PATHS, spinner);
@@ -94,62 +94,53 @@ export default class Client {
   }
 
   public async monitorGifts(): Promise<void> {
-    this.spinner.start("Monitoring gifts...");
+    this.spinner.start("Monitoring gifts...\n");
 
     // reading db file with data from last call
     const data = await fs.readFile(this.PATHS.DB_PATH, {
       encoding: "utf-8",
     });
+    const json = JSON.parse(data) as typeof gifts;
 
     // ? some testing snippets
-    //
-    let gifts = JSON.parse(
-      await fs.readFile(this.PATHS.TEST_PATH, { encoding: "utf-8" })
-    ) as any[];
+    // let gifts = JSON.parse(
+    //   await fs.readFile(this.PATHS.TEST_PATH, { encoding: "utf-8" })
+    // ) as any[];
+    // gifts = gifts.map((gift) => {
+    //   const { sticker, ...giftPayload } = gift;
+    //   const { fileReference, ...stickerPayload } = sticker;
 
-    gifts = gifts.map((gift) => {
-      const { sticker, ...giftPayload } = gift;
-      const { fileReference, ...stickerPayload } = sticker;
-
-      return {
-        ...giftPayload,
-        sticker: {
-          ...stickerPayload,
-          fileReference: Buffer.from(fileReference, "base64"),
-        },
-      };
-    });
-
+    //   return {
+    //     ...giftPayload,
+    //     sticker: {
+    //       ...stickerPayload,
+    //       fileReference: Buffer.from(fileReference, "base64"),
+    //     },
+    //   };
+    // });
     // console.log("Gifts: ", gifts);
-    //
-    const giftIds = new Set(gifts.map((gift) => gift.id.toString()));
-    // const gifts = await this.getAvailableGifts();
-    // console.log(Buffer.isBuffer(gifts[0]!.sticker.fileReference));
-    // console.log(gifts[0]!.sticker.fileReference.toString("base64"));
+    // const giftIds = new Set(gifts.map((gift) => gift.id.toString()));
 
-    // parsing data from file as json
-    const savedGifts = JSON.parse(data) as typeof gifts;
+    const gifts = await this.getAvailableGifts();
 
     // getting ids of db items to see changes
-    const savedGiftIds = new Set(savedGifts.map((gift) => gift.id.toString()));
-
-    // console.log(giftIds, savedGiftIds);
+    const savedGiftsIds = new Set(json.map((gift) => gift.id.toString()));
 
     const newGifts = gifts.filter(
-      (gift) => !savedGiftIds.has(gift.id.toString()) // set is more convenient
+      (gift) => !savedGiftsIds.has(gift.id.toString()) // set is more convenient
     );
     if (!newGifts.length) {
       this.spinner.fail("There are no new gifts");
       return;
     }
 
-    this.spinner.succeed(`Found ${newGifts.length} new gifts`);
+    this.spinner.succeed(`Found ${newGifts.length} new gifts\n`);
 
     // updating db file with received changes
     await fs.truncate(this.PATHS.DB_PATH, 0);
 
-    // Transform gifts for saving, but keep original type for further use
-    const giftsToSave = gifts.map((gift) => {
+    // transforming | fileReference | for saving (testing especially)
+    const savedGifts = gifts.map((gift) => {
       const { sticker, ...giftPayload } = gift;
       const { fileReference, ...stickerPayload } = sticker;
 
@@ -162,11 +153,8 @@ export default class Client {
       };
     });
 
-    // console.log(JSON.stringify(giftsToSave[0]));
-
-    //console.log(JSON.stringify(giftsToSave));
-    // Ensure all fileReference fields are strings before saving
-    await fs.writeFile(this.PATHS.DB_PATH, JSON.stringify(giftsToSave), {
+    // changing db file
+    await fs.writeFile(this.PATHS.DB_PATH, JSON.stringify(savedGifts), {
       flag: "w",
     });
 
@@ -208,7 +196,7 @@ export default class Client {
             const filePath = path.join(this.DIRS.TEMP_DIR, fileName);
 
             // saving file to temp folder
-            await fs.writeFile(filePath, file!);
+            await fs.writeFile(filePath, file!, { flag: "w" });
 
             // calculating basic description of file
             const fileStats = await fs.stat(filePath);
@@ -242,7 +230,7 @@ export default class Client {
 
         // when upper timeout is ready, calling finish
         setTimeout(() => {
-          this.spinner.succeed("Duplication is completed!");
+          this.spinner.succeed("Duplication is completed!\n");
 
           resolve();
         }, Constants.SEND_DELAY * gifts.length).unref(); // waiting whole time
