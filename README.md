@@ -53,7 +53,8 @@ $ npm run start
 
 <img src="./assets/telegram.svg" width=50 />
 
-<div style="width: 100%; text-align: center;">
-    <br />
-    Made with ❤️ by @artndev
-</div>
+<br/>
+
+<center>
+Made with ❤️ by @artndev
+</center>
