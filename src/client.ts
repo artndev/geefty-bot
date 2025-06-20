@@ -22,8 +22,8 @@ export default class Client {
 
   constructor(
     _client: TelegramClient,
-    _DIRS: I_DIRS,
-    _PATHS: I_PATHS,
+    _DIRS: I_Dirs,
+    _PATHS: I_Paths,
     _spinner: Ora
   ) {
     this.client = _client;
@@ -37,8 +37,12 @@ export default class Client {
     const spinner = ora();
     spinner.start("Client is building...\n");
 
+    // pre-made methods to set | this | variables for client constructor
+    const DIRS = await Constants.DIRS();
+    const PATHS = await Constants.PATHS();
+
     const _client = new TelegramClient(
-      new StoreSession("auth"), // its important for users not bots though its required
+      new StoreSession(path.join("src", "data", "auth")), // its important for users not bots though its required
       Number(process.env.APP_API_ID),
       process.env.APP_API_HASH!,
       {
@@ -63,10 +67,6 @@ export default class Client {
     await _client.start({
       botAuthToken: process.env.BOT_TOKEN!,
     });
-
-    // pre-made methods to set | this | variables for client constructor
-    const DIRS = await Constants.DIRS();
-    const PATHS = Constants.PATHS;
 
     // invoking client class
     const client = new Client(_client, DIRS, PATHS, spinner);
@@ -96,12 +96,6 @@ export default class Client {
   public async monitorGifts(): Promise<void> {
     this.spinner.start("Monitoring gifts...\n");
 
-    // reading db file with data from last call
-    const data = await fs.readFile(this.PATHS.DB_PATH, {
-      encoding: "utf-8",
-    });
-    const json = JSON.parse(data) as typeof gifts;
-
     // ? some testing snippets
     // let gifts = JSON.parse(
     //   await fs.readFile(this.PATHS.TEST_PATH, { encoding: "utf-8" })
@@ -121,9 +115,16 @@ export default class Client {
     // console.log("Gifts: ", gifts);
     // const giftIds = new Set(gifts.map((gift) => gift.id.toString()));
 
+    // getting ids of db items to see changes
     const gifts = await this.getAvailableGifts();
 
-    // getting ids of db items to see changes
+    // reading db file with data from last call
+    const data = await fs.readFile(this.PATHS.DB_PATH.path, {
+      encoding: "utf-8",
+      flag: "w+",
+    });
+
+    const json = JSON.parse(data) as typeof gifts;
     const savedGiftsIds = new Set(json.map((gift) => gift.id.toString()));
 
     const newGifts = gifts.filter(
@@ -137,7 +138,7 @@ export default class Client {
     this.spinner.succeed(`Found ${newGifts.length} new gifts\n`);
 
     // updating db file with received changes
-    await fs.truncate(this.PATHS.DB_PATH, 0);
+    await fs.truncate(this.PATHS.DB_PATH.path, 0);
 
     // transforming | fileReference | for saving (testing especially)
     const savedGifts = gifts.map((gift) => {
@@ -154,7 +155,7 @@ export default class Client {
     });
 
     // changing db file
-    await fs.writeFile(this.PATHS.DB_PATH, JSON.stringify(savedGifts), {
+    await fs.writeFile(this.PATHS.DB_PATH.path, JSON.stringify(savedGifts), {
       flag: "w",
     });
 

@@ -23,13 +23,24 @@ export default class Constants {
       ? Math.abs(Number(process.env.SEND_DELAY))
       : 2500;
 
-  static _DIRS: I_DIRS = {
-    TEMP_DIR: path.join(import.meta.dirname, "/temp"),
+  static _DIRS: I_Dirs = {
+    TEMP_DIR: path.join(import.meta.dirname, "data", "temp"),
+    AUTH_DIR: path.join(import.meta.dirname, "data", "auth"),
   };
-  static PATHS: I_PATHS = {
-    DB_PATH: path.join(import.meta.dirname, "db.txt"),
-    DEFAULT_PATH: path.join(import.meta.dirname, "json", "default_2.txt"),
-    TEST_PATH: path.join(import.meta.dirname, "json", "test_2.txt"),
+  static _PATHS: I_Paths = {
+    DB_PATH: {
+      path: path.join(import.meta.dirname, "data", "db.txt"),
+      writable: true,
+      content: "[]",
+    },
+    DEFAULT_PATH: {
+      path: path.join(import.meta.dirname, "data", "test", "default.txt"),
+      writable: false,
+    },
+    TEST_PATH: {
+      path: path.join(import.meta.dirname, "data", "test", "test.txt"),
+      writable: false,
+    },
   };
 
   // before dirs are got, making some preps
@@ -38,6 +49,12 @@ export default class Constants {
     await this.clearDirs();
 
     return this._DIRS;
+  };
+
+  static PATHS = async () => {
+    await this.createPaths();
+
+    return this._PATHS;
   };
 
   static clearDirs = async () => {
@@ -51,5 +68,15 @@ export default class Constants {
   private static createDirs = async () => {
     for (const [_, dir] of Object.entries(Constants._DIRS))
       await fs.mkdir(dir, { recursive: true });
+  };
+
+  private static createPaths = async () => {
+    for (const [_, file] of Object.entries(Constants._PATHS)) {
+      if (!file.writable) continue;
+
+      await fs.writeFile(file.path, file.content ?? "", {
+        flag: "w",
+      });
+    }
   };
 }

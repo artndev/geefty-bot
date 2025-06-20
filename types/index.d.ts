@@ -5,11 +5,17 @@ type T_StarGift = Api.StarGift & {
   sticker: Api.Document;
   soldOut?: boolean;
 };
-Api.Document;
+
 type T_StarGiftUnique = Api.StarGiftUnique & {
   stars: string;
   sticker: Api.Document;
   soldOut?: boolean;
+};
+
+type T_Path = {
+  path: string;
+  writable: boolean;
+  content?: string;
 };
 
 declare global {
@@ -17,14 +23,15 @@ declare global {
 
   type T_Dictionary<T> = { [key: string]: T };
 
-  interface I_DIRS extends T_Dictionary<string> {
+  interface I_Dirs extends T_Dictionary<string> {
     TEMP_DIR: string;
+    AUTH_DIR: string;
   }
 
-  interface I_PATHS extends T_Dictionary<string> {
-    DB_PATH: string;
-    DEFAULT_PATH: string;
-    TEST_PATH: string;
+  interface I_Paths extends T_Dictionary<T_Path> {
+    DB_PATH: T_Path;
+    DEFAULT_PATH: T_Path;
+    TEST_PATH: T_Path;
   }
 }
 
