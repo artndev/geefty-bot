@@ -3,6 +3,7 @@ dotenv.config();
 
 import fs from "fs/promises";
 import path from "path";
+const __dirname = process.cwd();
 
 // | constants | validations | utils |
 export default class Constants {
@@ -24,21 +25,21 @@ export default class Constants {
       : 2500;
 
   static _DIRS: I_Dirs = {
-    TEMP_DIR: path.join(import.meta.dirname, "data", "temp"),
-    AUTH_DIR: path.join(import.meta.dirname, "data", "auth"),
+    TEMP_DIR: path.join(__dirname, "data", "temp"),
+    AUTH_DIR: path.join(__dirname, "data", "auth"),
   };
   static _PATHS: I_Paths = {
     DB_PATH: {
-      path: path.join(import.meta.dirname, "data", "db.txt"),
+      path: path.join(__dirname, "data", "db.txt"),
       writable: true,
       content: "[]",
     },
     DEFAULT_PATH: {
-      path: path.join(import.meta.dirname, "data", "test", "default.txt"),
+      path: path.join(__dirname, "data", "test", "default.txt"),
       writable: false,
     },
     TEST_PATH: {
-      path: path.join(import.meta.dirname, "data", "test", "test.txt"),
+      path: path.join(__dirname, "data", "test", "test.txt"),
       writable: false,
     },
   };
