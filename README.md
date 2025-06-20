@@ -55,4 +55,4 @@ $ npm run start
 
 <br/>
 
-<center> Made with ❤️ by @artndev </center>
+<p align="center"> Made with ❤️ by @artndev </p>
