@@ -56,5 +56,7 @@ $ npm run start
 <br/>
 
 <center>
+
 Made with ❤️ by @artndev
+
 </center>
