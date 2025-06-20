@@ -10,7 +10,8 @@ Secondly, consider that you have already installed [Node.js](https://nodejs.org/
 # These variables can be obtained at https://my.telegram.org
 MTPROTO_SERVER_IP="..."
 MTPROTO_SERVER_PORT="..."
-MTPROTO_SERVER_NUMBER="..." # The number of server that you have selected
+# The number of server that you have selected
+MTPROTO_SERVER_NUMBER="..."
 
 # The same as above
 APP_API_ID="..."
@@ -27,7 +28,7 @@ AUDIT_DELAY="..."
 SEND_DELAY="..."
 ```
 
-Optionally, you can deploy the bot to VPS if you want it to work independently and skip all the steps ahead.
+Optionally, you can deploy the bot to _VPS_ if you want it to work independently and skip all the steps ahead.
 
 2. Install all dependencies.
 
