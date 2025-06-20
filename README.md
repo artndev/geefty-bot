@@ -30,14 +30,14 @@ SEND_DELAY="..."
 
 Optionally, you can deploy the bot to _VPS_ if you want it to work independently and skip all the steps ahead.
 
-2. Install all dependencies.
+2. Install all dependencies
 
 ```shell
 $ cd your-installing-root
 $ npm i
 ```
 
-3. Start the Geefty bot.
+3. Start the Geefty bot
 
 ```shell
 $ npm run start
