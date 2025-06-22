@@ -1,5 +1,5 @@
 <p align="center">
-<img src="./assets/spark.jpg" width="200" style="border-radius: 10px;" />
+<img src="./assets/spark.png" width="200" />
 </p>
 
 <h3 align="center">
