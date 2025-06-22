@@ -57,7 +57,7 @@ $ cd your-bot-root
 $ npm i
 ```
 
-3. Start the Geefty bot
+3. Start the Sparkly bot
 
 ```shell
 $ npm run start
