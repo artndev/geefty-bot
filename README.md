@@ -1,3 +1,11 @@
+<p align="center">
+<img src="./assets/spark.jpg" width="200" style="border-radius: 10px;" />
+</p>
+
+<h3 align="center">
+@sparkly_bot
+</h3>
+
 ## Installation
 
 Before we head to the manual, first of all, you need to download the latest release from [the releases tab](https://github.com/artndev/geefty-bot/releases) and unzip that archive in a folder on your disk.
@@ -8,32 +16,40 @@ Secondly, consider that you have already installed [Node.js](https://nodejs.org/
 
 ```env
 # These variables can be obtained at https://my.telegram.org
+
 MTPROTO_SERVER_IP="..."
 MTPROTO_SERVER_PORT="..."
+
 # The number of server that you have selected
 MTPROTO_SERVER_NUMBER="..."
 
-# The same as above
 APP_API_ID="..."
 APP_API_HASH="..."
 
-# You can create a telegram bot via @BotFather (https://t.me/BotFather)
+
+# You can create telegram bot via @BotFather (https://t.me/BotFather)
 BOT_TOKEN="..."
+
 
 # Logging channel. If you want to disable logging to telegram, just write -100
 CHAT_ID="..."
 
-# Debounces set in ms (write the amount of ms without 'ms' word)
+
+# Debounces set in ms (write amount of ms without 'ms' word)
+
+# Debounce between checks for gifts in console
 AUDIT_DELAY="..."
+
+# Debounce between each message sent to logging channel
 SEND_DELAY="..."
 ```
 
-Optionally, you can deploy the bot to _VPS_ if you want it to work independently and skip all the steps ahead.
+Optionally, you can deploy the bot to _VPS_ or _Railway_ (as I did) if you want it to work independently and skip all the steps ahead.
 
-2. Install all dependencies
+2. Install all dependencies with _npm_
 
 ```shell
-$ cd your-installing-root
+$ cd your-bot-root
 $ npm i
 ```
 
@@ -55,4 +71,4 @@ $ npm run start
 
 <br/>
 
-<p align="center"> Made with ❤️ by @artndev </p>
+<p align="center"> Made with 💛 by @artndev</p>
