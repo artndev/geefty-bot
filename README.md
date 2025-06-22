@@ -3,8 +3,12 @@
 </p>
 
 <h3 align="center">
-@sparkly_bot
+Sparkly Bots
 </h3>
+
+<p align="center">
+Make your own spark!
+</p>
 
 ## Installation
 
